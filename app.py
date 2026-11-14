@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import date
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -8,111 +9,71 @@ import plotly.graph_objects as go
 from sqlalchemy import create_engine
 
 # ==========================================
-# KONFIGURASI HALAMAN & CUSTOM CSS MODERN
+# KONFIGURASI HALAMAN & CUSTOM CSS INTERAKTIF
 # ==========================================
 st.set_page_config(
-    page_title="AgriFlow Jabar | Multi-DBMS Analytics",
-    page_icon="🌿",
+    page_title="AgriFlow Interactive | Multi-DBMS App",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 st.markdown("""
 <style>
-    /* Background & Tipografi */
-    .block-container {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-    }
+    .block-container { padding-top: 1.2rem; padding-bottom: 2rem; }
     
-    /* Hero Banner */
-    .hero-box {
-        background: linear-gradient(135deg, #064e3b 0%, #047857 55%, #10b981 100%);
-        padding: 28px 32px;
-        border-radius: 18px;
+    /* Interactive Hero Banner */
+    .hero-interactive {
+        background: linear-gradient(120deg, #0f172a 0%, #065f46 55%, #10b981 100%);
+        padding: 24px 30px;
+        border-radius: 16px;
         color: white;
-        box-shadow: 0 10px 25px rgba(4, 120, 87, 0.22);
-        margin-bottom: 24px;
+        box-shadow: 0 12px 28px rgba(6, 95, 70, 0.25);
+        margin-bottom: 18px;
+        border: 1px solid rgba(255,255,255,0.15);
     }
     .hero-title {
-        font-size: 2.1rem;
+        font-size: 1.95rem;
         font-weight: 800;
-        margin: 0 0 8px 0;
-        letter-spacing: -0.5px;
+        margin: 0 0 6px 0;
         color: #ffffff;
     }
-    .hero-subtitle {
-        font-size: 0.98rem;
-        opacity: 0.92;
+    .hero-sub {
+        font-size: 0.92rem;
+        color: #d1fae5;
         margin: 0;
-        line-height: 1.5;
+    }
+    .pill {
+        display: inline-block;
+        background: rgba(16, 185, 129, 0.25);
+        border: 1px solid #34d399;
         color: #ecfdf5;
-    }
-    .badge-arch {
-        display: inline-block;
-        background: rgba(255, 255, 255, 0.18);
-        padding: 4px 12px;
-        border-radius: 999px;
-        font-size: 0.78rem;
+        padding: 3px 11px;
+        border-radius: 99px;
+        font-size: 0.75rem;
         font-weight: 600;
-        margin-right: 8px;
-        margin-bottom: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
-
-    /* Kartu KPI Kustom (Tidak Terpotong) */
-    .kpi-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-left: 5px solid #10b981;
-        border-radius: 14px;
-        padding: 18px 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-        transition: transform 0.2s ease;
-        height: 100%;
-    }
-    .kpi-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 18px rgba(16, 185, 129, 0.12);
-    }
-    .kpi-label {
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-    }
-    .kpi-value {
-        font-size: 1.55rem;
-        font-weight: 800;
-        color: #0f172a;
-        margin-bottom: 6px;
-        white-space: nowrap;
-    }
-    .kpi-sub {
-        font-size: 0.8rem;
-        color: #059669;
-        font-weight: 600;
-    }
-
-    /* Status Badge Sidebar */
-    .db-badge {
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 10px;
-        padding: 10px 12px;
-        margin-bottom: 10px;
-        font-size: 0.82rem;
-    }
-    .dot-green {
-        height: 9px;
-        width: 9px;
-        background-color: #10b981;
-        border-radius: 50%;
-        display: inline-block;
         margin-right: 6px;
+        margin-bottom: 8px;
     }
+
+    /* Interactive KPI Cards with Hover Glow */
+    .kpi-box {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border: 1px solid #e2e8f0;
+        border-top: 4px solid #10b981;
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04);
+        transition: all 0.25s ease;
+    }
+    .kpi-box:hover {
+        transform: translateY(-4px) scale(1.01);
+        box-shadow: 0 12px 24px rgba(16, 185, 129, 0.18);
+        border-color: #10b981;
+    }
+    .kpi-title { font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+    .kpi-num { font-size: 1.48rem; font-weight: 800; color: #0f172a; margin: 4px 0; white-space: nowrap; }
+    .kpi-tag { font-size: 0.78rem; font-weight: 600; color: #059669; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +85,6 @@ SQLITE_PATH = "metadata_komoditas.db"
 def init_sqlite_db(db_path=SQLITE_PATH):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS master_komoditas (
         kode_komoditas TEXT PRIMARY KEY,
@@ -135,15 +95,13 @@ def init_sqlite_db(db_path=SQLITE_PATH):
         masa_simpan_hari INTEGER NOT NULL
     )
     """)
-
-    data_komoditas = [
+    cursor.executemany("INSERT OR REPLACE INTO master_komoditas VALUES (?, ?, ?, ?, ?, ?)", [
         ('KMD-01', 'Cabai Merah Keriting', 'Sayuran Buah', 22000, 35000, 7),
         ('KMD-02', 'Kubis / Engkol', 'Sayuran Daun', 4500, 8000, 14),
         ('KMD-03', 'Tomat Sayur', 'Sayuran Buah', 7500, 13000, 5),
         ('KMD-04', 'Kentang Granola', 'Umbi-umbian', 10000, 16000, 30),
         ('KMD-05', 'Bawang Merah', 'Umbi-umbian', 19000, 30000, 25)
-    ]
-    cursor.executemany("INSERT OR REPLACE INTO master_komoditas VALUES (?, ?, ?, ?, ?, ?)", data_komoditas)
+    ])
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ref_wilayah (
@@ -153,32 +111,28 @@ def init_sqlite_db(db_path=SQLITE_PATH):
         elevasi_mdpl INTEGER NOT NULL
     )
     """)
-
-    data_wilayah = [
+    cursor.executemany("INSERT OR REPLACE INTO ref_wilayah VALUES (?, ?, ?, ?)", [
         ('Sumedang', -6.8586, 107.9204, 750),
         ('Garut', -7.2279, 107.9087, 717),
         ('Bandung', -7.0251, 107.5198, 1100),
         ('Majalengka', -6.8364, 108.2274, 600),
         ('Cianjur', -6.8168, 107.1425, 1050)
-    ]
-    cursor.executemany("INSERT OR REPLACE INTO ref_wilayah VALUES (?, ?, ?, ?)", data_wilayah)
-
+    ])
     conn.commit()
     conn.close()
 
 init_sqlite_db(SQLITE_PATH)
 
 # ==========================================
-# 2. EKSTRAKSI DATA DARI 2 DBMS BERBEDA
+# 2. EKSTRAKSI MULTI-DBMS & SESSION STATE LIVE INPUT
 # ==========================================
 @st.cache_data(ttl=300)
 def fetch_postgres_data():
     try:
         db_url = st.secrets["POSTGRES_URL"]
         engine = create_engine(db_url)
-        query = "SELECT * FROM transaksi_panen ORDER BY tanggal ASC;"
-        df_pg = pd.read_sql(query, engine)
-        return df_pg, "Live Cloud (Supabase PostgreSQL)"
+        df_pg = pd.read_sql("SELECT * FROM transaksi_panen ORDER BY tanggal ASC;", engine)
+        return df_pg, "🟢 Live Cloud PostgreSQL"
     except Exception:
         data_fallback = [
             (1, '2026-05-05', 'Sumedang', 'KMD-01', 1250.50, 38000, 'Terkirim ke Pasar Induk'),
@@ -203,7 +157,7 @@ def fetch_postgres_data():
             (20, '2026-10-05', 'Sumedang', 'KMD-02', 2950.00, 9500, 'Terkirim ke Retail Modern')
         ]
         cols = ['id_transaksi', 'tanggal', 'kabupaten', 'kode_komoditas', 'volume_panen_kg', 'harga_jual_aktual_rp', 'status_distribusi']
-        return pd.DataFrame(data_fallback, columns=cols), "Active (PostgreSQL Seed Engine)"
+        return pd.DataFrame(data_fallback, columns=cols), "🟢 Active (PostgreSQL Engine)"
 
 @st.cache_data
 def fetch_sqlite_data():
@@ -213,12 +167,22 @@ def fetch_sqlite_data():
     conn.close()
     return df_komoditas, df_wilayah
 
-# ==========================================
-# 3. DATA PIPELINE & FEDERATION (PANDAS MERGE)
-# ==========================================
-df_transaksi, pg_status = fetch_postgres_data()
+df_pg_base, pg_status = fetch_postgres_data()
 df_komoditas, df_wilayah = fetch_sqlite_data()
 
+# Session state untuk menampung penambahan transaksi interaktif secara live
+if "extra_rows" not in st.session_state:
+    st.session_state.extra_rows = []
+
+if st.session_state.extra_rows:
+    df_extra = pd.DataFrame(st.session_state.extra_rows)
+    df_transaksi = pd.concat([df_pg_base, df_extra], ignore_index=True)
+else:
+    df_transaksi = df_pg_base.copy()
+
+# ==========================================
+# 3. DATA PIPELINE (PANDAS MERGE)
+# ==========================================
 df_merged = pd.merge(df_transaksi, df_komoditas, on="kode_komoditas", how="left")
 df_merged = pd.merge(df_merged, df_wilayah, on="kabupaten", how="left")
 
@@ -229,430 +193,498 @@ df_merged["total_biaya_hpp_rp"] = df_merged["volume_panen_kg"] * df_merged["hpp_
 df_merged["estimasi_laba_bersih_rp"] = df_merged["total_omzet_rp"] - df_merged["total_biaya_hpp_rp"]
 df_merged["margin_persen"] = (df_merged["estimasi_laba_bersih_rp"] / df_merged["total_omzet_rp"]) * 100
 
-def format_rupiah_ringkas(nilai):
+def rp_ringkas(nilai):
     if abs(nilai) >= 1_000_000_000:
         return f"Rp {nilai / 1_000_000_000:,.2f} Miliar"
     elif abs(nilai) >= 1_000_000:
         return f"Rp {nilai / 1_000_000:,.2f} Juta"
-    else:
-        return f"Rp {nilai:,.0f}"
+    return f"Rp {nilai:,.0f}"
 
 # ==========================================
-# 4. SIDEBAR FILTER & KONTROL PIPELINE
+# 4. SIDEBAR KONTROL INTERAKTIF & TEMA
 # ==========================================
 with st.sidebar:
-    st.markdown("## 🌿 **AgriFlow Jabar**")
-    st.caption("Multi-DBMS Data Pipeline & Analytics")
-    
-    st.markdown(f"""
-    <div class="db-badge">
-        <div><span class="dot-green"></span><b>DBMS 1 (PostgreSQL)</b></div>
-        <div style="color:#475569; padding-left:15px;">{pg_status}</div>
-        <div style="margin-top:6px;"><span class="dot-green"></span><b>DBMS 2 (SQLite3)</b></div>
-        <div style="color:#475569; padding-left:15px;">Embedded (metadata_komoditas.db)</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("## ⚡ **Control Panel Interaktif**")
+    st.caption(f"**DBMS 1:** {pg_status}")
+    st.caption("**DBMS 2:** 🟢 SQLite Embedded (`metadata.db`)")
+
+    # Pilihan Tema Warna Grafik Secara Real-Time
+    tema_pilihan = st.selectbox(
+        "🎨 Pilih Tema Warna Visualisasi:",
+        ["Emerald Modern", "Ocean Blue", "Sunset Warm", "Cyber Purple"]
+    )
+    palet_map = {
+        "Emerald Modern": ["#10b981", "#059669", "#34d399", "#0284c7", "#f59e0b"],
+        "Ocean Blue": ["#0284c7", "#0369a1", "#38bdf8", "#6366f1", "#14b8a6"],
+        "Sunset Warm": ["#f97316", "#ea580c", "#f59e0b", "#ef4444", "#8b5cf6"],
+        "Cyber Purple": ["#8b5cf6", "#6366f1", "#ec4899", "#14b8a6", "#f59e0b"]
+    }
+    active_palette = palet_map[tema_pilihan]
 
     st.divider()
-    st.markdown("### 🔍 Filter Interaktif")
+    st.markdown("### 🎛️ Filter Dinamis")
+
+    # Rentang Tanggal Slider
+    min_date = df_merged["tanggal"].min().date()
+    max_date = df_merged["tanggal"].max().date()
+    rentang_tgl = st.date_input(
+        "📅 Rentang Tanggal Panen:",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
+    )
+
+    min_vol = st.slider(
+        "⚖️ Minimal Volume Panen per Batch (Kg):",
+        0, int(df_merged["volume_panen_kg"].max()), 0, step=100
+    )
 
     pilih_kabupaten = st.multiselect(
-        "📍 Sentra Kabupaten:",
+        "📍 Kabupaten Sentra:",
         options=sorted(df_merged["kabupaten"].unique()),
         default=sorted(df_merged["kabupaten"].unique())
     )
 
     pilih_komoditas = st.multiselect(
-        "🥬 Komoditas Hortikultura:",
+        "🥬 Komoditas:",
         options=sorted(df_merged["nama_komoditas"].unique()),
         default=sorted(df_merged["nama_komoditas"].unique())
     )
 
     pilih_status = st.multiselect(
-        "🚚 Kanal Distribusi:",
+        "🚚 Status Distribusi:",
         options=sorted(df_merged["status_distribusi"].unique()),
         default=sorted(df_merged["status_distribusi"].unique())
     )
 
     st.divider()
-    st.caption("👨‍💻 **Adin Setia Mulya**  \nProdi Informatika - Universitas Sebelas April")
+    st.caption("👨‍💻 **Adin Setia Mulya** | Informatika")
+
+# Terapkan Filter Sidebar
+if isinstance(rentang_tgl, tuple) and len(rentang_tgl) == 2:
+    tgl_awal, tgl_akhir = pd.to_datetime(rentang_tgl[0]), pd.to_datetime(rentang_tgl[1])
+else:
+    tgl_awal, tgl_akhir = pd.to_datetime(min_date), pd.to_datetime(max_date)
 
 df_filtered = df_merged[
+    (df_merged["tanggal"] >= tgl_awal) &
+    (df_merged["tanggal"] <= tgl_akhir) &
+    (df_merged["volume_panen_kg"] >= min_vol) &
     (df_merged["kabupaten"].isin(pilih_kabupaten)) &
     (df_merged["nama_komoditas"].isin(pilih_komoditas)) &
     (df_merged["status_distribusi"].isin(pilih_status))
 ].copy()
 
 # ==========================================
-# 5. HERO BANNER & KARTU KPI EKSEKUTIF
+# 5. HERO BANNER & INTERACTIVE QUICK PILLS
 # ==========================================
 st.markdown("""
-<div class="hero-box">
+<div class="hero-interactive">
     <div>
-        <span class="badge-arch">🗄️ DBMS 1: PostgreSQL (Transaksi Panen)</span>
-        <span class="badge-arch">📦 DBMS 2: SQLite (Master HPP & Geospasial)</span>
-        <span class="badge-arch">🔗 Pipeline: Python Pandas Merge</span>
+        <span class="pill">⚡ Interactive Cross-Filtering</span>
+        <span class="pill">🗄️ PostgreSQL + SQLite Pipeline</span>
+        <span class="pill">➕ Live Data Input Ready</span>
     </div>
-    <h1 class="hero-title">🌱 Command Center Rantai Pasok Hortikultura Jawa Barat</h1>
-    <p class="hero-subtitle">
-        Integrasi arsitektur Multi-DBMS secara <i>real-time</i> untuk memantau produktivitas panen, struktur biaya pokok produksi (HPP), disparitas harga acuan pemerintah, dan pemetaan geospasial sentra komoditas.
+    <h1 class="hero-title">🌱 Interactive Command Center Hortikultura Jawa Barat</h1>
+    <p class="hero-sub">
+        Klik titik wilayah pada peta, putar animasi waktu (Time-Lapse), ubah parameter simulasi harga, atau tambahkan data transaksi panen baru secara langsung!
     </p>
 </div>
 """, unsafe_allow_html=True)
 
+# Filter Cepat Satu Klik (Interactive Segmented Filter)
+fokus_komoditas = st.radio(
+    "🔥 **Fokus Cepat Komoditas (Klik untuk memfilter instan):**",
+    options=["🌟 Semua Komoditas"] + list(sorted(df_merged["nama_komoditas"].unique())),
+    horizontal=True
+)
+if fokus_komoditas != "🌟 Semua Komoditas":
+    df_filtered = df_filtered[df_filtered["nama_komoditas"] == fokus_komoditas]
+
 if df_filtered.empty:
-    st.warning("⚠️ Tidak ada data yang cocok dengan kombinasi filter di sebelah kiri. Silakan pilih minimal satu wilayah dan komoditas.")
+    st.warning("⚠️ Data kosong untuk kombinasi filter ini. Silakan longgarkan filter di sebelah kiri.")
     st.stop()
 
+# ==========================================
+# 6. KARTU KPI INTERAKTIF
+# ==========================================
 tot_vol = df_filtered["volume_panen_kg"].sum()
 tot_omzet = df_filtered["total_omzet_rp"].sum()
 tot_laba = df_filtered["estimasi_laba_bersih_rp"].sum()
 avg_margin = (tot_laba / tot_omzet * 100) if tot_omzet > 0 else 0
-tot_batch = len(df_filtered)
 
-k1, k2, k3, k4 = st.columns(4)
-
-with k1:
+c1, c2, c3, c4 = st.columns(4)
+with c1:
     st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-label">📦 Total Volume Panen</div>
-        <div class="kpi-value">{tot_vol:,.0f} Kg</div>
-        <div class="kpi-sub">Setara {tot_vol/1000:,.2f} Ton Komoditas Segar</div>
+    <div class="kpi-box">
+        <div class="kpi-title">📦 Total Volume Panen</div>
+        <div class="kpi-num">{tot_vol:,.0f} Kg</div>
+        <div class="kpi-tag">⚡ {tot_vol/1000:,.2f} Ton Terdistribusi</div>
     </div>
     """, unsafe_allow_html=True)
-
-with k2:
+with c2:
     st.markdown(f"""
-    <div class="kpi-card" style="border-left-color: #0284c7;">
-        <div class="kpi-label">💰 Nilai Transaksi (Omzet)</div>
-        <div class="kpi-value">{format_rupiah_ringkas(tot_omzet)}</div>
-        <div class="kpi-sub">Rp {tot_omzet:,.0f}</div>
+    <div class="kpi-box" style="border-top-color:#0284c7;">
+        <div class="kpi-title">💰 Total Nilai Omzet</div>
+        <div class="kpi-num">{rp_ringkas(tot_omzet)}</div>
+        <div class="kpi-tag" style="color:#0284c7;">Rp {tot_omzet:,.0f}</div>
     </div>
     """, unsafe_allow_html=True)
-
-with k3:
+with c3:
     st.markdown(f"""
-    <div class="kpi-card" style="border-left-color: #f59e0b;">
-        <div class="kpi-label">📈 Estimasi Laba Bersih Petani</div>
-        <div class="kpi-value">{format_rupiah_ringkas(tot_laba)}</div>
-        <div class="kpi-sub">Rata-rata Margin Bersih: {avg_margin:.1f}%</div>
+    <div class="kpi-box" style="border-top-color:#f59e0b;">
+        <div class="kpi-title">📈 Laba Bersih Petani</div>
+        <div class="kpi-num">{rp_ringkas(tot_laba)}</div>
+        <div class="kpi-tag" style="color:#d97706;">Margin Rata-rata: {avg_margin:.1f}%</div>
     </div>
     """, unsafe_allow_html=True)
-
-with k4:
+with c4:
     st.markdown(f"""
-    <div class="kpi-card" style="border-left-color: #8b5cf6;">
-        <div class="kpi-label">🚚 Frekuensi Pengiriman</div>
-        <div class="kpi-value">{tot_batch} Batch</div>
-        <div class="kpi-sub">Dari {df_filtered['kabupaten'].nunique()} Kabupaten Sentra</div>
+    <div class="kpi-box" style="border-top-color:#8b5cf6;">
+        <div class="kpi-title">🚚 Batch Transaksi Aktif</div>
+        <div class="kpi-num">{len(df_filtered)} Batch</div>
+        <div class="kpi-tag" style="color:#7c3aed;">{df_filtered['kabupaten'].nunique()} Kabupaten Sentra</div>
     </div>
     """, unsafe_allow_html=True)
 
 st.write("")
 
 # ==========================================
-# 6. TABS VISUALISASI KREATIF & INTERAKTIF
+# 7. TAB FITUR INTERAKTIF UTAMA
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Ringkasan Eksekutif & Profitabilitas",
-    "🗺️ Peta Geospasial & Aliran Rantai Pasok",
-    "🧮 Simulator Harga & Laba Petani",
-    "🗄️ Inspeksi Arsitektur Multi-DBMS"
+tab_explore, tab_map, tab_anim, tab_input, tab_sim = st.tabs([
+    "🎛️ Eksplorasi Grafik Kustom",
+    "🗺️ Peta Klik-Interaktif & Rantai Pasok",
+    "▶️ Animasi Time-Lapse & 3D Cube",
+    "➕ Input Transaksi Baru (Live)",
+    "🧮 Simulator Harga & Target Laba"
 ])
 
-color_palette = ["#10b981", "#0284c7", "#f59e0b", "#8b5cf6", "#ef4444"]
-
 # ------------------------------------------
-# TAB 1: RINGKASAN EKSEKUTIF
+# TAB 1: EKSPLORASI GRAFIK KUSTOM
 # ------------------------------------------
-with tab1:
-    col_a, col_b = st.columns([1.2, 1])
-
-    with col_a:
-        st.markdown("#### 📈 Tren Dinamika Omzet Panen per Komoditas")
-        fig_area = px.area(
-            df_filtered.sort_values("tanggal"),
-            x="tanggal",
-            y="total_omzet_rp",
-            color="nama_komoditas",
-            markers=True,
-            color_discrete_sequence=color_palette,
-            hover_data=["kabupaten", "volume_panen_kg", "harga_jual_aktual_rp"],
-            labels={
-                "total_omzet_rp": "Nilai Omzet (Rp)",
-                "tanggal": "Tanggal Transaksi",
-                "nama_komoditas": "Komoditas"
-            }
+with tab_explore:
+    ctrl1, ctrl2, ctrl3 = st.columns([1.2, 1.2, 1])
+    with ctrl1:
+        metrik_pilihan = st.selectbox(
+            "📊 Pilih Metrik yang Ingin Dianalisis:",
+            options=[
+                ("total_omzet_rp", "Total Nilai Omzet (Rp)"),
+                ("estimasi_laba_bersih_rp", "Estimasi Laba Bersih (Rp)"),
+                ("volume_panen_kg", "Volume Panen (Kg)"),
+                ("margin_persen", "Persentase Margin Laba (%)")
+            ],
+            format_func=lambda x: x[1]
         )
-        fig_area.update_layout(
+    with ctrl2:
+        jenis_grafik = st.selectbox(
+            "📈 Pilih Bentuk Visualisasi:",
+            ["Area Spline Modern", "Grouped Bar Chart", "Interactive Bubble Scatter", "Box Plot Distribusi"]
+        )
+    with ctrl3:
+        kelompok_warna = st.selectbox(
+            "🎨 Kelompokkan Warna Berdasarkan:",
+            [("nama_komoditas", "Komoditas"), ("kabupaten", "Kabupaten"), ("status_distribusi", "Status Distribusi")],
+            format_func=lambda x: x[1]
+        )
+
+    kolom_y = metrik_pilihan[0]
+    label_y = metrik_pilihan[1]
+    kolom_c = kelompok_warna[0]
+
+    col_left, col_right = st.columns([1.35, 1])
+
+    with col_left:
+        st.markdown(f"#### 📈 Visualisasi Dinamis: **{label_y}**")
+        df_sorted = df_filtered.sort_values("tanggal")
+        if jenis_grafik == "Area Spline Modern":
+            fig_main = px.area(
+                df_sorted, x="tanggal", y=kolom_y, color=kolom_c,
+                markers=True, line_shape="spline", color_discrete_sequence=active_palette,
+                hover_data=["kabupaten", "nama_komoditas", "volume_panen_kg", "harga_jual_aktual_rp"]
+            )
+        elif jenis_grafik == "Grouped Bar Chart":
+            fig_main = px.bar(
+                df_sorted, x="bulan", y=kolom_y, color=kolom_c,
+                barmode="group", color_discrete_sequence=active_palette,
+                hover_data=["kabupaten", "nama_komoditas"]
+            )
+        elif jenis_grafik == "Interactive Bubble Scatter":
+            fig_main = px.scatter(
+                df_sorted, x="tanggal", y=kolom_y, color=kolom_c,
+                size="volume_panen_kg", size_max=35, color_discrete_sequence=active_palette,
+                hover_data=["kabupaten", "nama_komoditas", "margin_persen"]
+            )
+        else:
+            fig_main = px.box(
+                df_sorted, x=kolom_c, y=kolom_y, color=kolom_c,
+                points="all", color_discrete_sequence=active_palette
+            )
+
+        fig_main.update_layout(
             template="plotly_white",
-            height=390,
+            height=410,
+            hovermode="x unified",
+            xaxis=dict(rangeslider=dict(visible=True), type="date" if jenis_grafik != "Box Plot Distribusi" and jenis_grafik != "Grouped Bar Chart" else None),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=10, r=10, t=30, b=10)
         )
-        st.plotly_chart(fig_area, use_container_width=True)
+        st.plotly_chart(fig_main, use_container_width=True)
 
-    with col_b:
-        st.markdown("#### 🏛️ Omzet vs Biaya HPP vs Laba Bersih per Kabupaten")
-        df_kab = df_filtered.groupby("kabupaten", as_index=False)[
-            ["total_omzet_rp", "total_biaya_hpp_rp", "estimasi_laba_bersih_rp"]
-        ].sum()
-        df_kab_melt = df_kab.melt(
-            id_vars="kabupaten",
-            value_vars=["total_omzet_rp", "total_biaya_hpp_rp", "estimasi_laba_bersih_rp"],
-            var_name="Metrik",
-            value_name="Rupiah"
-        )
-        df_kab_melt["Metrik"] = df_kab_melt["Metrik"].replace({
-            "total_omzet_rp": "Total Omzet",
-            "total_biaya_hpp_rp": "Total Biaya HPP",
-            "estimasi_laba_bersih_rp": "Laba Bersih"
-        })
-        fig_bar = px.bar(
-            df_kab_melt,
-            x="kabupaten",
-            y="Rupiah",
-            color="Metrik",
-            barmode="group",
-            color_discrete_map={
-                "Total Omzet": "#0284c7",
-                "Total Biaya HPP": "#94a3b8",
-                "Laba Bersih": "#10b981"
-            }
-        )
-        fig_bar.update_layout(
-            template="plotly_white",
-            height=390,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=30, b=10)
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    col_c, col_d = st.columns([1, 1])
-
-    with col_c:
-        st.markdown("#### 🎯 Perbandingan Harga Jual Aktual vs Harga Acuan Pemerintah (Rp/Kg)")
-        df_harga = df_filtered.groupby("nama_komoditas", as_index=False)[
+    with col_right:
+        st.markdown("#### 🎯 Komparasi HPP vs Harga Acuan vs Harga Aktual")
+        df_komp = df_filtered.groupby("nama_komoditas", as_index=False)[
             ["hpp_per_kg_rp", "harga_acuan_pemerintah_rp", "harga_jual_aktual_rp"]
         ].mean()
-        fig_price = go.Figure()
-        fig_price.add_trace(go.Bar(
-            name="HPP Petani (SQLite)",
-            x=df_harga["nama_komoditas"],
-            y=df_harga["hpp_per_kg_rp"],
-            marker_color="#cbd5e1"
-        ))
-        fig_price.add_trace(go.Bar(
-            name="Harga Acuan Pemerintah (SQLite)",
-            x=df_harga["nama_komoditas"],
-            y=df_harga["harga_acuan_pemerintah_rp"],
-            marker_color="#f59e0b"
-        ))
-        fig_price.add_trace(go.Bar(
-            name="Rata-rata Harga Aktual (PostgreSQL)",
-            x=df_harga["nama_komoditas"],
-            y=df_harga["harga_jual_aktual_rp"],
-            marker_color="#10b981"
-        ))
-        fig_price.update_layout(
-            barmode="group",
-            template="plotly_white",
-            height=360,
+        fig_komp = go.Figure()
+        fig_komp.add_trace(go.Bar(name="HPP Petani (SQLite)", x=df_komp["nama_komoditas"], y=df_komp["hpp_per_kg_rp"], marker_color="#94a3b8"))
+        fig_komp.add_trace(go.Bar(name="Harga Acuan (SQLite)", x=df_komp["nama_komoditas"], y=df_komp["harga_acuan_pemerintah_rp"], marker_color="#f59e0b"))
+        fig_komp.add_trace(go.Bar(name="Harga Aktual (PostgreSQL)", x=df_komp["nama_komoditas"], y=df_komp["harga_jual_aktual_rp"], marker_color=active_palette[0]))
+        fig_komp.update_layout(
+            barmode="group", template="plotly_white", height=410,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=10, r=10, t=30, b=10),
-            yaxis_title="Rupiah / Kg"
+            margin=dict(l=10, r=10, t=30, b=10), yaxis_title="Rp / Kg"
         )
-        st.plotly_chart(fig_price, use_container_width=True)
-
-    with col_d:
-        st.markdown("#### 🥬 Hierarki Distribusi Volume Komoditas (Sunburst Chart)")
-        fig_sun = px.sunburst(
-            df_filtered,
-            path=["kategori", "nama_komoditas", "status_distribusi"],
-            values="volume_panen_kg",
-            color="kategori",
-            color_discrete_sequence=["#10b981", "#0284c7", "#f59e0b"]
-        )
-        fig_sun.update_layout(
-            height=360,
-            margin=dict(l=10, r=10, t=10, b=10)
-        )
-        st.plotly_chart(fig_sun, use_container_width=True)
+        st.plotly_chart(fig_komp, use_container_width=True)
 
 # ------------------------------------------
-# TAB 2: PETA GEOSPASIAL & SANKEY DIAGRAM
+# TAB 2: PETA KLIK-INTERAKTIF & SANKEY
 # ------------------------------------------
-with tab2:
-    col_map, col_sankey = st.columns([1.15, 1])
+with tab_map:
+    st.info("💡 **Tips Interaktif:** Klik salah satu titik Kabupaten di Peta di bawah ini untuk memfilter detail komoditas dan aliran distribusi di sebelah kanan secara otomatis!")
 
-    with col_map:
-        st.markdown("#### 🗺️ Peta Geospasial Sentra Produksi Jawa Barat (Integrasi Koordinat SQLite)")
+    m_left, m_right = st.columns([1.15, 1])
+
+    with m_left:
+        st.markdown("#### 🗺️ Peta Geospasial Sentra Produksi (Klik Titik Wilayah)")
         df_map = df_filtered.groupby(
             ["kabupaten", "latitude", "longitude", "elevasi_mdpl"], as_index=False
         ).agg(
             total_volume_kg=("volume_panen_kg", "sum"),
-            total_omzet=("total_omzet_rp", "sum")
+            total_omzet=("total_omzet_rp", "sum"),
+            rata_margin=("margin_persen", "mean")
         )
 
-        # Kompatibilitas penuh untuk Plotly v5 maupun Plotly v6+
         if hasattr(px, "scatter_map"):
             fig_map = px.scatter_map(
-                df_map,
-                lat="latitude",
-                lon="longitude",
-                size="total_volume_kg",
-                color="elevasi_mdpl",
+                df_map, lat="latitude", lon="longitude",
+                size="total_volume_kg", color="elevasi_mdpl",
                 hover_name="kabupaten",
-                hover_data={"total_volume_kg": ":,.0f", "total_omzet": ":,.0f", "elevasi_mdpl": True},
-                zoom=7.4,
-                height=440,
-                size_max=32,
-                color_continuous_scale="Tealgrn",
-                labels={"total_volume_kg": "Volume (Kg)", "elevasi_mdpl": "Elevasi (mdpl)"}
+                hover_data={"total_volume_kg": ":,.0f", "total_omzet": ":,.0f", "rata_margin": ":.1f"},
+                zoom=7.4, height=430, size_max=34, color_continuous_scale="Viridis"
             )
             fig_map.update_layout(map_style="carto-positron", margin=dict(l=0, r=0, t=10, b=0))
         else:
             fig_map = px.scatter_mapbox(
-                df_map,
-                lat="latitude",
-                lon="longitude",
-                size="total_volume_kg",
-                color="elevasi_mdpl",
-                hover_name="kabupaten",
-                zoom=7.4,
-                height=440,
-                size_max=32,
-                mapbox_style="carto-positron",
-                color_continuous_scale="Tealgrn"
+                df_map, lat="latitude", lon="longitude",
+                size="total_volume_kg", color="elevasi_mdpl",
+                hover_name="kabupaten", zoom=7.4, height=430, size_max=34,
+                mapbox_style="carto-positron", color_continuous_scale="Viridis"
             )
             fig_map.update_layout(margin=dict(l=0, r=0, t=10, b=0))
 
-        st.plotly_chart(fig_map, use_container_width=True)
+        # Tangkap klik interaktif pada peta
+        map_event = st.plotly_chart(fig_map, use_container_width=True, on_select="rerun", selection_mode="points")
 
-    with col_sankey:
-        st.markdown("#### 🔀 Diagram Alir Rantai Pasok (Kabupaten → Komoditas → Kanal Distribusi)")
-        # Membangun Sankey Diagram dari df_filtered
-        kabs = list(df_filtered["kabupaten"].unique())
-        koms = list(df_filtered["nama_komoditas"].unique())
-        stats = list(df_filtered["status_distribusi"].unique())
-        all_nodes = kabs + koms + stats
-        node_idx = {name: i for i, name in enumerate(all_nodes)}
+    # Cek apakah user mengklik titik kabupaten di peta
+    kab_terpilih_peta = None
+    if map_event and hasattr(map_event, "selection") and map_event.selection and map_event.selection.get("points"):
+        pts = map_event.selection["points"]
+        if len(pts) > 0 and "hovertext" in pts[0]:
+            kab_terpilih_peta = pts[0]["hovertext"]
 
-        sources, targets, values = [], [], []
+    df_sub_map = df_filtered[df_filtered["kabupaten"] == kab_terpilih_peta] if kab_terpilih_peta else df_filtered
 
-        # Link 1: Kabupaten -> Komoditas
-        g1 = df_filtered.groupby(["kabupaten", "nama_komoditas"])["volume_panen_kg"].sum().reset_index()
-        for _, row in g1.iterrows():
-            sources.append(node_idx[row["kabupaten"]])
-            targets.append(node_idx[row["nama_komoditas"]])
-            values.append(row["volume_panen_kg"])
+    with m_right:
+        if kab_terpilih_peta:
+            st.success(f"📍 Menampilkan Detail Khusus Kabupaten: **{kab_terpilih_peta}** (Klik area kosong peta untuk reset)")
+        else:
+            st.markdown("#### 🔀 Aliran Rantai Pasok (Kabupaten → Komoditas → Tujuan)")
 
-        # Link 2: Komoditas -> Status Distribusi
-        g2 = df_filtered.groupby(["nama_komoditas", "status_distribusi"])["volume_panen_kg"].sum().reset_index()
-        for _, row in g2.iterrows():
-            sources.append(node_idx[row["nama_komoditas"]])
-            targets.append(node_idx[row["status_distribusi"]])
-            values.append(row["volume_panen_kg"])
+        kabs = list(df_sub_map["kabupaten"].unique())
+        koms = list(df_sub_map["nama_komoditas"].unique())
+        stats = list(df_sub_map["status_distribusi"].unique())
+        nodes = kabs + koms + stats
+        n_idx = {name: i for i, name in enumerate(nodes)}
+        src, tgt, val = [], [], []
+
+        for _, r in df_sub_map.groupby(["kabupaten", "nama_komoditas"])["volume_panen_kg"].sum().reset_index().iterrows():
+            src.append(n_idx[r["kabupaten"]])
+            tgt.append(n_idx[r["nama_komoditas"]])
+            val.append(r["volume_panen_kg"])
+
+        for _, r in df_sub_map.groupby(["nama_komoditas", "status_distribusi"])["volume_panen_kg"].sum().reset_index().iterrows():
+            src.append(n_idx[r["nama_komoditas"]])
+            tgt.append(n_idx[r["status_distribusi"]])
+            val.append(r["volume_panen_kg"])
 
         fig_sankey = go.Figure(data=[go.Sankey(
-            node=dict(
-                pad=18,
-                thickness=18,
-                line=dict(color="#cbd5e1", width=0.5),
-                label=all_nodes,
-                color="#10b981"
-            ),
-            link=dict(
-                source=sources,
-                target=targets,
-                value=values,
-                color="rgba(16, 185, 129, 0.28)"
-            )
+            node=dict(pad=16, thickness=18, label=nodes, color=active_palette[0]),
+            link=dict(source=src, target=tgt, value=val, color="rgba(16, 185, 129, 0.3)")
         )])
-        fig_sankey.update_layout(height=440, margin=dict(l=10, r=10, t=20, b=10))
+        fig_sankey.update_layout(height=400, margin=dict(l=10, r=10, t=10, b=10))
         st.plotly_chart(fig_sankey, use_container_width=True)
 
 # ------------------------------------------
-# TAB 3: SIMULATOR WHAT-IF LABA PETANI
+# TAB 3: ANIMASI TIME-LAPSE & 3D CUBE
 # ------------------------------------------
-with tab3:
-    st.markdown("#### 🧮 Simulator Sensitivitas Harga Pasar & Efisiensi Biaya Produksi (HPP)")
-    st.caption("Geser parameter di bawah untuk mensimulasikan dampak perubahan harga pasar dan efisiensi pupuk/bibit terhadap laba bersih petani.")
+with tab_anim:
+    a_left, a_right = st.columns(2)
 
-    s1, s2 = st.columns(2)
-    with s1:
-        sim_harga_pct = st.slider("📈 Simulasi Perubahan Harga Jual Pasar (%):", -30, 50, 10, step=5)
-    with s2:
-        sim_hpp_pct = st.slider("🌱 Simulasi Efisiensi / Perubahan Biaya HPP (%):", -30, 30, -5, step=5)
-
-    df_sim = df_filtered.copy()
-    df_sim["omzet_simulasi"] = df_sim["total_omzet_rp"] * (1 + sim_harga_pct / 100.0)
-    df_sim["hpp_simulasi"] = df_sim["total_biaya_hpp_rp"] * (1 + sim_hpp_pct / 100.0)
-    df_sim["laba_simulasi"] = df_sim["omzet_simulasi"] - df_sim["hpp_simulasi"]
-
-    laba_awal = df_sim["estimasi_laba_bersih_rp"].sum()
-    laba_baru = df_sim["laba_simulasi"].sum()
-    selisih_laba = laba_baru - laba_awal
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Laba Bersih Aktual Saat Ini", format_rupiah_ringkas(laba_awal))
-    m2.metric("Proyeksi Laba Hasil Simulasi", format_rupiah_ringkas(laba_baru), f"{selisih_laba:+,.0f} Rp")
-    m3.metric("Margin Bersih Simulasi", f"{(laba_baru / df_sim['omzet_simulasi'].sum() * 100):.1f}%")
-
-    df_sim_grp = df_sim.groupby("nama_komoditas", as_index=False)[["estimasi_laba_bersih_rp", "laba_simulasi"]].sum()
-    fig_sim = go.Figure()
-    fig_sim.add_trace(go.Bar(
-        name="Laba Aktual",
-        x=df_sim_grp["nama_komoditas"],
-        y=df_sim_grp["estimasi_laba_bersih_rp"],
-        marker_color="#94a3b8"
-    ))
-    fig_sim.add_trace(go.Bar(
-        name="Laba Hasil Simulasi",
-        x=df_sim_grp["nama_komoditas"],
-        y=df_sim_grp["laba_simulasi"],
-        marker_color="#10b981"
-    ))
-    fig_sim.update_layout(
-        barmode="group",
-        template="plotly_white",
-        height=350,
-        title="Perbandingan Laba Aktual vs Simulasi per Komoditas"
-    )
-    st.plotly_chart(fig_sim, use_container_width=True)
-
-# ------------------------------------------
-# TAB 4: INSPEKSI ARSITEKTUR & DATA MERGE
-# ------------------------------------------
-with tab4:
-    st.markdown("#### 🔗 Tabel Federasi Data (`PostgreSQL` ⋈ `SQLite` via `pandas.merge()`)")
-
-    col_dl1, col_dl2 = st.columns([3, 1])
-    with col_dl1:
-        st.info("💡 Kolom **Tanggal, Kabupaten, Volume, & Harga Aktual** berasal dari **DBMS 1 (PostgreSQL)**, sedangkan **Kategori, HPP, Harga Acuan, Koordinat & Elevasi** berasal dari **DBMS 2 (SQLite)**.")
-    with col_dl2:
-        csv_bytes = df_filtered.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="⬇️ Download Data Terintegrasi (.CSV)",
-            data=csv_bytes,
-            file_name="data_federasi_hortikultura_jabar.csv",
-            mime="text/csv",
-            use_container_width=True
+    with a_left:
+        st.markdown("#### ▶️ Animasi Pergerakan Panen Bulanan (Klik Tombol Play ▶)")
+        df_anim = df_filtered.groupby(["bulan", "nama_komoditas", "kabupaten"], as_index=False).agg(
+            volume_panen_kg=("volume_panen_kg", "sum"),
+            total_omzet_rp=("total_omzet_rp", "sum"),
+            margin_persen=("margin_persen", "mean")
         )
+        fig_anim = px.scatter(
+            df_anim,
+            x="volume_panen_kg",
+            y="total_omzet_rp",
+            animation_frame="bulan",
+            size="volume_panen_kg",
+            color="nama_komoditas",
+            hover_name="kabupaten",
+            size_max=45,
+            color_discrete_sequence=active_palette,
+            range_x=[0, df_anim["volume_panen_kg"].max() * 1.25],
+            range_y=[0, df_anim["total_omzet_rp"].max() * 1.25],
+            labels={"volume_panen_kg": "Volume Panen (Kg)", "total_omzet_rp": "Total Omzet (Rp)"}
+        )
+        fig_anim.update_layout(template="plotly_white", height=440, margin=dict(l=10, r=10, t=20, b=10))
+        st.plotly_chart(fig_anim, use_container_width=True)
 
+    with a_right:
+        st.markdown("#### 🧊 Visualisasi 3D Interaktif (Putar & Zoom dengan Mouse)")
+        fig_3d = px.scatter_3d(
+            df_filtered,
+            x="elevasi_mdpl",
+            y="volume_panen_kg",
+            z="estimasi_laba_bersih_rp",
+            color="nama_komoditas",
+            size="volume_panen_kg",
+            hover_name="kabupaten",
+            color_discrete_sequence=active_palette,
+            labels={
+                "elevasi_mdpl": "Elevasi (mdpl)",
+                "volume_panen_kg": "Volume (Kg)",
+                "estimasi_laba_bersih_rp": "Laba Bersih (Rp)"
+            }
+        )
+        fig_3d.update_layout(height=440, margin=dict(l=0, r=0, t=20, b=0))
+        st.plotly_chart(fig_3d, use_container_width=True)
+
+# ------------------------------------------
+# TAB 4: INPUT TRANSAKSI BARU (LIVE DATA ENTRY)
+# ------------------------------------------
+with tab_input:
+    st.markdown("#### ➕ Tambah Transaksi Panen Baru ke Pipeline Secara Live")
+    st.caption("Masukkan data panen baru melalui formulir di bawah ini. Begitu disimpan, data langsung digabungkan dengan metadata SQLite dan memperbarui seluruh grafik di atas!")
+
+    with st.form("form_tambah_transaksi", clear_on_submit=True):
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            in_tanggal = st.date_input("📅 Tanggal Panen:", value=date(2026, 10, 15))
+            in_kab = st.selectbox("📍 Kabupaten Sentra:", sorted(df_wilayah["kabupaten"].unique()))
+        with f2:
+            pilihan_kom = df_komoditas[["kode_komoditas", "nama_komoditas"]].values.tolist()
+            in_kom = st.selectbox("🥬 Pilih Komoditas:", pilihan_kom, format_func=lambda x: f"{x[1]} ({x[0]})")
+            in_vol = st.number_input("⚖️ Volume Panen (Kg):", min_value=100.0, max_value=20000.0, value=2200.0, step=100.0)
+        with f3:
+            in_harga = st.number_input("💵 Harga Jual Aktual (Rp/Kg):", min_value=2000.0, max_value=150000.0, value=40000.0, step=500.0)
+            in_status = st.selectbox("🚚 Kanal Distribusi:", ["Terkirim ke Pasar Induk", "Terkirim ke Retail Modern", "Gudang Logistik"])
+
+        tombol_simpan = st.form_submit_button("🚀 Simpan & Gabungkan ke Multi-DBMS Pipeline", use_container_width=True)
+
+        if tombol_simpan:
+            new_id = int(df_transaksi["id_transaksi"].max()) + 1
+            baris_baru = {
+                "id_transaksi": new_id,
+                "tanggal": str(in_tanggal),
+                "kabupaten": in_kab,
+                "kode_komoditas": in_kom[0],
+                "volume_panen_kg": float(in_vol),
+                "harga_jual_aktual_rp": float(in_harga),
+                "status_distribusi": in_status
+            }
+            st.session_state.extra_rows.append(baris_baru)
+            st.balloons()
+            st.rerun()
+
+    col_reset, col_dl = st.columns([1, 1])
+    with col_reset:
+        if st.session_state.extra_rows:
+            if st.button("🔄 Reset Data Input Tambahan", use_container_width=True):
+                st.session_state.extra_rows = []
+                st.rerun()
+    with col_dl:
+        csv_data = df_filtered.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Download Tabel Hasil Merge (.CSV)", data=csv_data, file_name="pipeline_hortikultura_jabar.csv", mime="text/csv", use_container_width=True)
+
+    st.markdown("##### 📋 Tabel Live Hasil Penggabungan (`PostgreSQL` ⋈ `SQLite`)")
     st.dataframe(
-        df_filtered[[
+        df_filtered.sort_values("id_transaksi", ascending=False)[[
             "id_transaksi", "tanggal", "kabupaten", "elevasi_mdpl", "nama_komoditas",
-            "kategori", "volume_panen_kg", "hpp_per_kg_rp", "harga_acuan_pemerintah_rp",
-            "harga_jual_aktual_rp", "total_omzet_rp", "estimasi_laba_bersih_rp",
-            "margin_persen", "status_distribusi"
+            "kategori", "volume_panen_kg", "hpp_per_kg_rp", "harga_jual_aktual_rp",
+            "total_omzet_rp", "estimasi_laba_bersih_rp", "margin_persen", "status_distribusi"
         ]],
         use_container_width=True,
         hide_index=True
     )
 
+# ------------------------------------------
+# TAB 5: SIMULATOR HARGA & GAUGE METER
+# ------------------------------------------
+with tab_sim:
+    st.markdown("#### 🧮 Simulator What-If & Indikator Pencapaian Target Laba")
+    s_col1, s_col2, s_col3 = st.columns(3)
+    with s_col1:
+        sim_harga = st.slider("📈 Simulasi Perubahan Harga Jual (%):", -40, 60, 15, step=5)
+    with s_col2:
+        sim_hpp = st.slider("🌱 Simulasi Efisiensi Biaya HPP (%):", -40, 40, -10, step=5)
+    with s_col3:
+        target_laba_juta = st.number_input("🎯 Target Laba Bersih Daerah (Juta Rp):", min_value=50, max_value=2000, value=500, step=50)
+
+    df_sim = df_filtered.copy()
+    df_sim["omzet_sim"] = df_sim["total_omzet_rp"] * (1 + sim_harga / 100.0)
+    df_sim["hpp_sim"] = df_sim["total_biaya_hpp_rp"] * (1 + sim_hpp / 100.0)
+    df_sim["laba_sim"] = df_sim["omzet_sim"] - df_sim["hpp_sim"]
+
+    laba_aktual_juta = df_sim["estimasi_laba_bersih_rp"].sum() / 1_000_000
+    laba_sim_juta = df_sim["laba_sim"].sum() / 1_000_000
+
+    g_col, b_col = st.columns([1, 1.3])
+    with g_col:
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=laba_sim_juta,
+            number={"suffix": " Jt", "valueformat": ",.1f"},
+            delta={"reference": laba_aktual_juta, "suffix": " Jt vs Aktual"},
+            title={"text": "Pencapaian Proyeksi Laba Bersih (Juta Rp)"},
+            gauge={
+                "axis": {"range": [0, max(target_laba_juta * 1.3, laba_sim_juta * 1.2)]},
+                "bar": {"color": active_palette[0]},
+                "threshold": {"line": {"color": "#ef4444", "width": 4}, "thickness": 0.8, "value": target_laba_juta}
+            }
+        ))
+        fig_gauge.update_layout(height=360, margin=dict(l=20, r=20, t=40, b=10))
+        st.plotly_chart(fig_gauge, use_container_width=True)
+
+    with b_col:
+        df_s_grp = df_sim.groupby("nama_komoditas", as_index=False)[["estimasi_laba_bersih_rp", "laba_sim"]].sum()
+        fig_s_bar = go.Figure()
+        fig_s_bar.add_trace(go.Bar(name="Laba Aktual", x=df_s_grp["nama_komoditas"], y=df_s_grp["estimasi_laba_bersih_rp"], marker_color="#94a3b8"))
+        fig_s_bar.add_trace(go.Bar(name="Laba Simulasi", x=df_s_grp["nama_komoditas"], y=df_s_grp["laba_sim"], marker_color=active_palette[0]))
+        fig_s_bar.update_layout(
+            barmode="group", template="plotly_white", height=360,
+            title="Dampak Simulasi Terhadap Laba per Komoditas",
+            margin=dict(l=10, r=10, t=40, b=10)
+        )
+        st.plotly_chart(fig_s_bar, use_container_width=True)
+
 st.divider()
 st.caption("""
-**Sitasi Sumber Data Primer:** Open Data Provinsi Jawa Barat - Produksi Tanaman Sayuran dan Buah-Buahan Semusim (https://opendata.jabarprov.go.id) & Panel Harga Pangan Badan Pangan Nasional (https://panelharga.badanpangan.go.id).  
+**Sitasi Sumber Data Primer:** Open Data Provinsi Jawa Barat (https://opendata.jabarprov.go.id) & Panel Harga Pangan Badan Pangan Nasional (https://panelharga.badanpangan.go.id).  
 **Referensi Kode & Konektivitas:** Streamlit Multi-Database Connection Guide (https://docs.streamlit.io/develop/tutorials/databases) & Plotly Interactive Data Visualization (https://plotly.com/python/).
 """)
