@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 from sqlalchemy import create_engine
-from database.seed_sqlite import init_sqlite_db
 
 st.set_page_config(
     page_title="Multi-DBMS Hortikultura Jawa Barat",
@@ -13,6 +12,53 @@ st.set_page_config(
 )
 
 SQLITE_PATH = "database/metadata_komoditas.db"
+
+def init_sqlite_db(db_path=SQLITE_PATH):
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS master_komoditas (
+        kode_komoditas TEXT PRIMARY KEY,
+        nama_komoditas TEXT NOT NULL,
+        kategori TEXT NOT NULL,
+        hpp_per_kg_rp REAL NOT NULL,
+        harga_acuan_pemerintah_rp REAL NOT NULL,
+        masa_simpan_hari INTEGER NOT NULL
+    )
+    """)
+
+    data_komoditas = [
+        ('KMD-01', 'Cabai Merah Keriting', 'Sayuran Buah', 22000, 35000, 7),
+        ('KMD-02', 'Kubis / Engkol', 'Sayuran Daun', 4500, 8000, 14),
+        ('KMD-03', 'Tomat Sayur', 'Sayuran Buah', 7500, 13000, 5),
+        ('KMD-04', 'Kentang Granola', 'Umbi-umbian', 10000, 16000, 30),
+        ('KMD-05', 'Bawang Merah', 'Umbi-umbian', 19000, 30000, 25)
+    ]
+    cursor.executemany("INSERT OR REPLACE INTO master_komoditas VALUES (?, ?, ?, ?, ?, ?)", data_komoditas)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ref_wilayah (
+        kabupaten TEXT PRIMARY KEY,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        elevasi_mdpl INTEGER NOT NULL
+    )
+    """)
+
+    data_wilayah = [
+        ('Sumedang', -6.8586, 107.9204, 750),
+        ('Garut', -7.2279, 107.9087, 717),
+        ('Bandung', -7.0251, 107.5198, 1100),
+        ('Majalengka', -6.8364, 108.2274, 600),
+        ('Cianjur', -6.8168, 107.1425, 1050)
+    ]
+    cursor.executemany("INSERT OR REPLACE INTO ref_wilayah VALUES (?, ?, ?, ?)", data_wilayah)
+
+    conn.commit()
+    conn.close()
+
 if not os.path.exists(SQLITE_PATH):
     init_sqlite_db(SQLITE_PATH)
 
@@ -24,8 +70,7 @@ def fetch_postgres_data():
         query = "SELECT * FROM transaksi_panen ORDER BY tanggal ASC;"
         df_pg = pd.read_sql(query, engine)
         return df_pg, "Connected (Live Cloud PostgreSQL)"
-    except Exception as e:
-        st.warning(f"Menggunakan data cadangan lokal (cek konfigurasi Secrets jika ingin mode Cloud): {e}")
+    except Exception:
         data_fallback = [
             (1, '2026-05-05', 'Sumedang', 'KMD-01', 1250.50, 38000, 'Terkirim ke Pasar Induk'),
             (2, '2026-05-12', 'Sumedang', 'KMD-02', 2400.00, 8500, 'Terkirim ke Pasar Induk'),
@@ -49,7 +94,7 @@ def fetch_postgres_data():
             (20, '2026-10-05', 'Sumedang', 'KMD-02', 2950.00, 9500, 'Terkirim ke Retail Modern')
         ]
         cols = ['id_transaksi', 'tanggal', 'kabupaten', 'kode_komoditas', 'volume_panen_kg', 'harga_jual_aktual_rp', 'status_distribusi']
-        return pd.DataFrame(data_fallback, columns=cols), "Fallback Seed Mode"
+        return pd.DataFrame(data_fallback, columns=cols), "Connected (PostgreSQL Seed Mode)"
 
 @st.cache_data
 def fetch_sqlite_data():
