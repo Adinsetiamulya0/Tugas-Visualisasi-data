@@ -7,8 +7,8 @@ Proyek ini disusun untuk memenuhi **Tugas Mandiri Terstruktur Mata Kuliah Visual
 * **Program Studi:** Informatika - Universitas Sebelas April
 
 ## 2. Daftar Tautan Utama
-* **URL Live Web Application:** *(Akan diisi setelah deploy ke Streamlit Cloud)*
-* **URL Repositori GitHub:** *(Tautan repositori GitHub ini)*
+* **URL Live Web Application:** *(https://tugas-visualisasi-data-erqflv2qfuasrhwbf9bb8r.streamlit.app/ )*
+* **URL Repositori GitHub:** *(https://github.com/Adinsetiamulya0/Tugas-Visualisasi-data.git)*
 * **URL Sumber Data Asli (Primer):**
   1. [Open Data Jabar - Data Produksi Hortikultura Kabupaten/Kota Jawa Barat](https://opendata.jabarprov.go.id/id/dataset/produksi-tanaman-sayuran-dan-buah-buahan-semusim-berdasarkan-kabupatenkota-di-jawa-barat)
   2. [Panel Harga Pangan Badan Pangan Nasional (Bapanas)](https://panelharga.badanpangan.go.id/)
